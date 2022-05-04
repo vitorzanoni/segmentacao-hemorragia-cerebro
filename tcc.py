@@ -4,6 +4,8 @@ import pydicom
 from skimage import morphology
 from PIL import Image, ImageOps
 import cv2
+import glob
+import os
 
 def getImagem(dicom):
     dicom = pydicom.dcmread(dicom)
@@ -39,30 +41,30 @@ def mostraEscalaCinza(imagem):
 def mostraHounsfield(imagem):
     plt.ylim([0, 2500])
     plt.hist(imagem.flatten(), bins=100, color='c')
-    plt.xlabel("Unidades de Hounsfield (HU)")
+    plt.xlabel("Unidades de Hounsfield")
     plt.ylabel("Frequência")
     plt.show()
 
 def segmentacao(imagem):
-    imagem[imagem <= 55] = 0
+    imagem[imagem <= 60] = 0
     imagem[imagem >= 100] = 0
     # plt.ylim([0, 2500])
     # plt.hist(imagem.flatten(), bins=100, color='c')
-    # plt.xlabel("Unidades de Hounsfield (HU)")
+    # plt.xlabel("Unidades de Hounsfield")
     # plt.ylabel("Frequência")
     # plt.show()
     return imagem
 
 def erosao(imagem):
     imagem = morphology.erosion(imagem, morphology.disk(8)).astype(np.uint8)
-    plt.imshow(imagem, 'gray')
-    plt.show()
+    # plt.imshow(imagem, 'gray')
+    # plt.show()
     return imagem
 
 def dilatacao(imagem):
     imagem = morphology.binary_dilation(imagem, morphology.disk(8)).astype(np.uint8)
-    plt.imshow(imagem, 'gray')
-    plt.show()
+    # plt.imshow(imagem, 'gray')
+    # plt.show()
     return imagem
 
 def aplicaMascara(imagem, mascara):
@@ -99,19 +101,67 @@ def componentesConectados(imagem):
 #     ax[1, 1].axis('off')
 #     plt.show()
 
+def findDiretorios():
+    diretorios = []
+    for name in glob.glob("E:/TCC/IMAGENS/CQ500/*", recursive = False):
+        diretorios.append(name)
+    return diretorios
+
+def findImagens(diretorio):
+    pastas = glob.glob(diretorio + "/*/*", recursive = False)
+
+    menosImagens = pastas[0]
+    count = len(glob.glob(pastas[0] + "/*", recursive = False))
+    # print("1 -> " + str(count))
+    pastas.pop(0)
+    for pasta in pastas:
+        tmpCount = len(glob.glob(pasta + "/*", recursive = False))
+        if tmpCount < count:
+            # print("2 -> " + str(tmpCount))
+            menosImagens = pasta
+            count = tmpCount
+    # print("3 -> " + menosImagens)
+
+    imagens = []
+    for name in glob.glob(menosImagens + "/*", recursive = False):
+        imagens.append(name)
+    return imagens
+
+def findHemorragia(imagens, diretorio):
+    fw = open("tcc_res.csv", "a")
+    for i in imagens:
+        imagem = getImagem(i)
+        # original = getImagem(i)
+        # mostraImagem(imagem)
+        # mostraHounsfield(imagem)
+        # imagem_255 = converteEscalaCinza(imagem)
+        # mostraEscalaCinza(imagem_255)
+        # componentesConectados("cinza.png")
+        imagem_seg = segmentacao(imagem)
+        # mostraImagem(imagem_seg)
+        imagem_seg = erosao(imagem_seg)
+        imagem_seg = dilatacao(imagem_seg)
+        if imagem_seg.argmax() > 0:
+            print(i)
+            # mostraImagem(original)
+            # plt.imshow(imagem_seg, 'gray')
+            # plt.show()
+            # aplicaMascara(imagem, imagem_seg)
+            fw.write(os.path.basename(diretorio) + ";1\n")
+            return
+    fw.write(os.path.basename(diretorio) + ";0\n")
+    fw.close()
+
 # connected components opencv
 # fazer erosao e depois dilatacao
 # multiplicar slope e somar intercept, segmentacao -> remover de -200 e +1000
 def main():
-    imagem = getImagem("CT000134.dcm")
-    mostraImagem(imagem)
-    mostraHounsfield(imagem)
-    imagem_255 = converteEscalaCinza(imagem)
-    mostraEscalaCinza(imagem_255)
-    imagem_seg = segmentacao(imagem)
-    mostraImagem(imagem_seg)
-    imagem_seg = erosao(imagem_seg)
-    imagem_seg = dilatacao(imagem_seg)
-    aplicaMascara(imagem, imagem_seg)
-    componentesConectados("cinza.png")
+    fw = open("tcc_res.csv", "w")
+    fw.write("PASTA;RES\n")
+    fw.close()
+    diretorios = findDiretorios()
+    for diretorio in diretorios:
+        if(os.path.isdir(diretorio)):
+            findHemorragia(findImagens(diretorio), diretorio)
+
 main()
