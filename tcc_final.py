@@ -12,6 +12,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.metrics import ConfusionMatrixDisplay
 from scipy.ndimage import gaussian_filter
 from datetime import datetime
+import seaborn as sns
 
 
 def get_imagem(dicom):
@@ -37,10 +38,10 @@ def salva_cc(diretorio, count, nb_components, output):
         color = colors[label]
         mask = labels == label
         imagem_cc[mask] = color
-    # os.makedirs(os.path.basename(
-    #     diretorio), exist_ok=True)
-    # cv2.imwrite("./" + os.path.basename(diretorio) +
-    #             "/" + str(count) + "_COR.png", imagem_cc)
+    os.makedirs(os.path.basename(
+        diretorio), exist_ok=True)
+    cv2.imwrite("./" + os.path.basename(diretorio) +
+                "/" + str(count) + "_COR.png", imagem_cc)
 
     return imagem_cc
 
@@ -58,11 +59,13 @@ def mostra_cc(original, imagem_cc, maior_area, count, diretorio):
     seg1 = np.concatenate((cor, antes), axis=1)
     seg2 = np.concatenate((original, depois), axis=1)
     seg3 = np.concatenate((seg1, seg2), axis=0)
-    cv2.imshow('Componentes Conectados', seg3)
-    # os.makedirs(os.path.basename(
-    #     diretorio), exist_ok=True)
-    # cv2.imwrite("./" + os.path.basename(diretorio) +
-    #             "/" + str(count) + "_CC.png", seg3)
+    # cv2.imshow('Componentes Conectados', seg3)
+    os.makedirs(os.path.basename(
+        diretorio), exist_ok=True)
+    cv2.imwrite("./" + os.path.basename(diretorio) +
+                "/" + str(count) + "_OG.png", original)
+    cv2.imwrite("./" + os.path.basename(diretorio) +
+                "/" + str(count) + "_CC.png", depois)
 
 
 def teste_mascara(cc_erosion, original, maior_area):
@@ -86,12 +89,14 @@ def teste_mascara(cc_erosion, original, maior_area):
 def componentes_conectados(imagem, seg_max, diretorio, count):
     original = window_image(imagem, 60, 120).astype(np.uint8)
     imagem[imagem > seg_max] = 0
-    # imagem = imagem * \
-    #     morphology.binary_opening(imagem, morphology.disk(cc_erosion))
+
+    seg1 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
+        np.uint8), cv2.COLOR_GRAY2BGR)
+    os.makedirs(os.path.basename(diretorio), exist_ok=True)
+    cv2.imwrite("./" + os.path.basename(diretorio) +
+                "/" + str(count) + "_SG1.png", seg1)
+
     imagem = window_image(imagem, 60, 120).astype(np.uint8)
-    # mascara_cranio = cv2.threshold(imagem, 200, 255, cv2.THRESH_BINARY)[1]
-    # mascara_cranio = cv2.bitwise_not(mascara_cranio)
-    # imagem = imagem * mascara_cranio
     nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(
         imagem)
     sizes = stats[:, -1]
@@ -105,12 +110,11 @@ def componentes_conectados(imagem, seg_max, diretorio, count):
         maior_area = np.zeros(output.shape)
         maior_area[output == max_label] = 1
         imagem_cc = salva_cc(diretorio, count, nb_components, output)
-        # mostra_cc(original, imagem_cc, maior_area,
-        #           cc_erosion, count, diretorio)
+        mostra_cc(original, imagem_cc, maior_area,
+                  count, diretorio)
     else:
         maior_area = imagem
-    # maior_area = morphology.binary_closing(
-    #     maior_area, morphology.disk(cc_erosion))
+
     if (cv2.waitKey(1) & 0xFF) == ord('q'):
         cv2.destroyAllWindows()
     for i in range(len(maior_area)):
@@ -128,7 +132,6 @@ def window_image(img: np.ndarray,
                  window_center: int,
                  window_width: int,
                  rescale: bool = True) -> np.ndarray:
-
     img = img.astype(np.float32)
     # for translation adjustments given in the dicom file.
     img_min = window_center - window_width//2  # minimum HU level
@@ -222,48 +225,88 @@ def mostra_seg(img_num, total, i, imagem, area, antes):
     seg1 = np.concatenate((area, antes), axis=1)
     seg2 = np.concatenate((depois, original), axis=1)
     seg3 = np.concatenate((seg1, seg2), axis=0)
-    cv2.imshow('Segmentacao', seg3)
+    # cv2.imshow('Segmentacao', seg3)
+    return original
 
 
 def find_hemorragia(imagens, diretorio, seg_min, seg_max, disk_size, sigma_val, res_atual):
     fw = open("tcc_teste.csv", "a")
     count = 0
     img_num, total, imagens = load_scan_sorted(imagens)
+    exame_ini = datetime.now()
     for i in imagens:
+        slice_ini = datetime.now()
         img_num += 1
         imagem = get_imagem(i)
         cc_mask = componentes_conectados(
             imagem, seg_max, diretorio, img_num)
         imagem = imagem * cc_mask
 
+        seg2 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
+            np.uint8), cv2.COLOR_GRAY2BGR)
+        os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        cv2.imwrite("./" + os.path.basename(diretorio) +
+                    "/" + str(img_num) + "_SG2.png", seg2)
+
         imagem, gaussian_image = apply_gaussian_filter(
             seg_min, seg_max, sigma_val, imagem)
         # mostra_fg(i, cc_mask, gaussian_image)
 
+        fg = cv2.cvtColor(window_image(
+            gaussian_image, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        cv2.imwrite("./" + os.path.basename(diretorio) +
+                    "/" + str(img_num) + "_FG.png", fg)
+
+        seg3 = cv2.cvtColor(window_image(
+            imagem, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        cv2.imwrite("./" + os.path.basename(diretorio) +
+                    "/" + str(img_num) + "_SG3.png", seg3)
+
         area = window_image(gaussian_image, 60, 120).astype(np.uint8)
         antes = window_image(imagem, 60, 120).astype(np.uint8)
-        imagem = morphology.binary_opening(
+        # imagem = morphology.binary_opening(
+        #     imagem, morphology.disk(disk_size))
+
+        imagem = morphology.binary_erosion(
             imagem, morphology.disk(disk_size))
+        ero = cv2.cvtColor((window_image(
+            imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
+        cv2.imwrite("./" + os.path.basename(diretorio) +
+                    "/" + str(img_num) + "_ERO.png", ero)
+
+        imagem = morphology.binary_dilation(
+            imagem, morphology.disk(disk_size))
+        dil = cv2.cvtColor((window_image(
+            imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
+        cv2.imwrite("./" + os.path.basename(diretorio) +
+                    "/" + str(img_num) + "_DIL.png", dil)
+
         if imagem.max() > 0:
             count += 1
-            # mostra_seg(img_num, total, i, imagem, area, antes)
-            if (cv2.waitKey(1) & 0xFF) == ord('q'):
-                cv2.destroyAllWindows()
-                break
-            # if res_atual == 0:
-            #     os.makedirs(os.path.basename(diretorio), exist_ok=True)
-            #     cv2.imwrite("./" + os.path.basename(diretorio) +
-            #                 "/" + str(img_num) + "_SEG" + str(count) + ".png", seg3)
+            seg = mostra_seg(img_num, total, i, imagem, area, antes)
+            os.makedirs(os.path.basename(diretorio), exist_ok=True)
+            cv2.imwrite("./" + os.path.basename(diretorio) +
+                        "/" + str(img_num) + "_SEG" + str(count) + ".png", seg)
+        else:
+            seg = mostra_seg(img_num, total, i, imagem, area, antes)
+            os.makedirs(os.path.basename(diretorio), exist_ok=True)
+            cv2.imwrite("./" + os.path.basename(diretorio) +
+                        "/" + str(img_num) + "_NOSEG.png", seg)
+        if (cv2.waitKey(1) & 0xFF) == ord('q'):
+            cv2.destroyAllWindows()
+            break
+        slice_fim = datetime.now()
+        slice_temp = slice_fim - slice_ini
+        # print(
+        #     f'Tempo Slice: {slice_temp.total_seconds()}')
 
+    exame_fim = datetime.now()
+    exame_temp = exame_fim - exame_ini
+    # print(
+    #     f'Tempo Exame: {exame_temp.total_seconds()}')
     if count >= 1:
-        if os.path.basename(diretorio) in bugs:
-            fw.write(os.path.basename(diretorio) + ";0;" + str(count) + "\n")
-            fw.close()
-            return 0
-        fw.write(os.path.basename(diretorio) + ";1;" + str(count) + "\n")
-        fw.close()
-        return 1
-    elif os.path.basename(diretorio) == "CQ500CT113 CQ500CT113":
         fw.write(os.path.basename(diretorio) + ";1;" + str(count) + "\n")
         fw.close()
         return 1
@@ -272,10 +315,16 @@ def find_hemorragia(imagens, diretorio, seg_min, seg_max, disk_size, sigma_val, 
     return 0
 
 
-bugs = ["CQ500CT105 CQ500CT105", "CQ500CT123 CQ500CT123",
-        "CQ500CT124 CQ500CT124", "CQ500CT127 CQ500CT127", "CQ500CT132 CQ500CT132"]
-RES = [0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1,
-       0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0]
+RES = [0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0,
+       0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0,
+       1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0,
+       0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1,
+       0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+       0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1,
+       1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0,
+       1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 0,
+       1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0,
+       1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0]
 diretorios = find_diretorios()
 
 
@@ -313,25 +362,50 @@ def performance(bounds):
     f1txt.write("F1-Score: %.20f\n" % (score))
     print("F1-Score:", score)
 
-    # matriz = confusion_matrix(validacao, res)
+    matriz = confusion_matrix(validacao, res)
     # cm_display = ConfusionMatrixDisplay(
-    #     confusion_matrix=matriz, display_labels=[False, True])
+    #     confusion_matrix=matriz, display_labels=["Saudável", "Não Saudável"])
     # cm_display.plot()
-    # plt.show()
+    # cm_display.ax_.set(xlabel='Classificação Predita',
+    #                    ylabel='Classificação Real')
 
-    now = datetime.now()
-    current_time = now.strftime("%d/%m/%Y %H:%M:%S")
+    sns.set_theme(font_scale=2, rc={'figure.figsize': (10, 8)})
+    ax = sns.heatmap(matriz, annot=True, fmt='g',
+                     cmap=sns.color_palette("flare", as_cmap=True))
+    ax.set_xlabel("Classificação Predita")
+    ax.set_ylabel("Classificação Real")
+    ax.xaxis.set_ticklabels(["Saudável", "Não Saudável"])
+    ax.yaxis.set_ticklabels(["Saudável", "Não Saudável"])
+
+    now2 = datetime.now()
+    now3 = now2 - now
+    current_time = now2.strftime("%d/%m/%Y %H:%M:%S")
     print(f'Fim: {current_time}')
+    print(
+        f'Tempo: {int(now3.total_seconds() // 60)}:{now3.total_seconds() - ((now3.total_seconds() // 60) * 60)}')
     f1txt.write(f'Fim: {current_time}\n')
     f1txt.close()
     return score * -1
 
 
 def main():
-    bounds = [(50, 75), (75, 101), (2, 6), (0, 6)]
-    result = differential_evolution(performance, bounds)
+    # bounds = [(50, 75), (75, 101), (2, 6), (0, 6)]
+    # result = differential_evolution(performance, bounds)
+    # 50.08803987095695475773, 86.71610084319101474648, 4.84795220930039150176, 2.45324398424467071678 # usar esse
+    # 50.60006964356053771326, 86.56139984090714278864, 4.67032122564753926497, 2.23910991042969964582
+    # 50.31570196656763016563, 86.75417763293270922986, 4.72120205271766835153, 2.56849357717579485083
+    # 51.17108169100011849650, 86.59956876783407153653, 3.76213373312758125877, 6.87147069150776701463, 3.33002622294939554237 # original
     # result = performance([51.17108169100011849650, 86.59956876783407153653,
-    #                      3.76213373312758125877, 6.87147069150776701463, 3.33002622294939554237])
+    #                       3.76213373312758125877, 3.33002622294939554237])
+    # result = performance([50.31570196656763016563, 86.75417763293270922986,
+    #                     4.72120205271766835153, 2.56849357717579485083])
+    # result = performance([50.60006964356053771326, 86.56139984090714278864,
+    #                      4.67032122564753926497, 2.23910991042969964582])
+
+    result = performance([50.08803987095695475773, 86.71610084319101474648,
+                         4.84795220930039150176, 2.45324398424467071678])
+    # result = performance([60, 90, 3, 1])
+    plt.show()
     print(result)
     f1txt = open("resultados.txt", "a")
     f1txt.write(str(result) + "\n")
