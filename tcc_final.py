@@ -1,18 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pydicom
-from skimage import morphology
-from PIL import Image, ImageOps
-import cv2
 import glob
 import os
-from sklearn.metrics import f1_score
-from scipy.optimize import differential_evolution
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import ConfusionMatrixDisplay
-from scipy.ndimage import gaussian_filter
 from datetime import datetime
+
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
+import pydicom
 import seaborn as sns
+from scipy.ndimage import gaussian_filter
+from scipy.optimize import differential_evolution
+from skimage import morphology
+from sklearn.metrics import confusion_matrix, f1_score
 
 
 def get_imagem(dicom):
@@ -38,17 +36,15 @@ def salva_cc(diretorio, count, nb_components, output):
         color = colors[label]
         mask = labels == label
         imagem_cc[mask] = color
-    os.makedirs(os.path.basename(
-        diretorio), exist_ok=True)
-    cv2.imwrite("./" + os.path.basename(diretorio) +
-                "/" + str(count) + "_COR.png", imagem_cc)
+    # os.makedirs(os.path.basename(
+    #     diretorio), exist_ok=True)
+    # cv2.imwrite("./" + os.path.basename(diretorio) +
+    #             "/" + str(count) + "_COR.png", imagem_cc)
 
     return imagem_cc
 
 
 def mostra_cc(original, imagem_cc, maior_area, count, diretorio):
-    # antes = morphology.binary_closing(
-    #     maior_area, morphology.disk(8))
     antes = maior_area
     depois = original * antes
     antes = antes * 255
@@ -59,48 +55,30 @@ def mostra_cc(original, imagem_cc, maior_area, count, diretorio):
     seg1 = np.concatenate((cor, antes), axis=1)
     seg2 = np.concatenate((original, depois), axis=1)
     seg3 = np.concatenate((seg1, seg2), axis=0)
-    # cv2.imshow('Componentes Conectados', seg3)
-    os.makedirs(os.path.basename(
-        diretorio), exist_ok=True)
-    cv2.imwrite("./" + os.path.basename(diretorio) +
-                "/" + str(count) + "_OG.png", original)
-    cv2.imwrite("./" + os.path.basename(diretorio) +
-                "/" + str(count) + "_CC.png", depois)
-
-
-def teste_mascara(cc_erosion, original, maior_area):
-    antes = maior_area
-    depois = morphology.binary_closing(
-        maior_area, morphology.disk(cc_erosion))
-    original = original * depois
-    antes = antes * 255
-    depois = depois * 255
-    teste = depois - antes
-    antes = cv2.cvtColor(antes.astype(np.uint8), cv2.COLOR_GRAY2BGR)
-    depois = cv2.cvtColor(depois.astype(np.uint8), cv2.COLOR_GRAY2BGR)
-    teste = cv2.cvtColor(teste.astype(np.uint8), cv2.COLOR_GRAY2BGR)
-    original = cv2.cvtColor(original, cv2.COLOR_GRAY2BGR)
-    seg1 = np.concatenate((antes, depois), axis=1)
-    seg2 = np.concatenate((teste, original), axis=1)
-    seg3 = np.concatenate((seg1, seg2), axis=0)
-    cv2.imshow('Teste', seg3)
+    cv2.imshow('Componentes Conectados', seg3)
+    # os.makedirs(os.path.basename(
+    #     diretorio), exist_ok=True)
+    # cv2.imwrite("./" + os.path.basename(diretorio) +
+    #             "/" + str(count) + "_OG.png", original)
+    # cv2.imwrite("./" + os.path.basename(diretorio) +
+    #             "/" + str(count) + "_CC.png", depois)
 
 
 def componentes_conectados(imagem, seg_max, diretorio, count):
-    original = window_image(imagem, 60, 120).astype(np.uint8)
+    # original = window_image(imagem, 60, 120).astype(np.uint8)
     imagem[imagem > seg_max] = 0
 
-    seg1 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
-        np.uint8), cv2.COLOR_GRAY2BGR)
-    os.makedirs(os.path.basename(diretorio), exist_ok=True)
-    cv2.imwrite("./" + os.path.basename(diretorio) +
-                "/" + str(count) + "_SG1.png", seg1)
+    # seg1 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
+    #     np.uint8), cv2.COLOR_GRAY2BGR)
+    # os.makedirs(os.path.basename(diretorio), exist_ok=True)
+    # cv2.imwrite("./" + os.path.basename(diretorio) +
+    #             "/" + str(count) + "_SG1.png", seg1)
 
     imagem = window_image(imagem, 60, 120).astype(np.uint8)
     nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(
         imagem)
     sizes = stats[:, -1]
-    if (len(sizes) > 1):
+    if len(sizes) > 1:
         max_label = 1
         max_size = sizes[1]
         for i in range(2, nb_components):
@@ -109,20 +87,20 @@ def componentes_conectados(imagem, seg_max, diretorio, count):
                 max_size = sizes[i]
         maior_area = np.zeros(output.shape)
         maior_area[output == max_label] = 1
-        imagem_cc = salva_cc(diretorio, count, nb_components, output)
-        mostra_cc(original, imagem_cc, maior_area,
-                  count, diretorio)
+        # imagem_cc = salva_cc(diretorio, count, nb_components, output)
+        # mostra_cc(original, imagem_cc, maior_area,
+        #           count, diretorio)
     else:
         maior_area = imagem
 
     if (cv2.waitKey(1) & 0xFF) == ord('q'):
         cv2.destroyAllWindows()
     for i in range(len(maior_area)):
-        if (1 in maior_area[i]):
+        if 1 in maior_area[i]:
             maior_area[i:i + round(len(maior_area)*0.05), :] = 0
             break
     for i in range(len(maior_area) - 1, 0, -1):
-        if (1 in maior_area[i]):
+        if 1 in maior_area[i]:
             maior_area[i - round(len(maior_area)*0.05):, :] = 0
             break
     return maior_area
@@ -146,11 +124,11 @@ def window_image(img: np.ndarray,
 
 
 def find_diretorios():
-    diretorios = []
+    dirs = []
     for name in glob.glob("C:/Users/vitor/Downloads/Vitor/tcc/PD1/TCC/CQ500/*", recursive=False):
-        if (name.find(".zip") == -1):
-            diretorios.append(name)
-    return sorted(diretorios)
+        if name.find(".zip") == -1:
+            dirs.append(name)
+    return sorted(dirs)
 
 
 def find_imagens(diretorio):
@@ -177,8 +155,8 @@ def load_scan_sorted(list_dicom_paths):
         slices.append([path, pydicom.dcmread(path)])
     slices = sorted(slices, key=lambda x: x[1].ImagePositionPatient[-1])
     imagens = []
-    for slice in slices:
-        imagens.append(slice[0])
+    for slc in slices:
+        imagens.append(slc[0])
     total = len(imagens)
     inicio = round(total*0.45)
     fim = round(total*0.85)
@@ -225,7 +203,7 @@ def mostra_seg(img_num, total, i, imagem, area, antes):
     seg1 = np.concatenate((area, antes), axis=1)
     seg2 = np.concatenate((depois, original), axis=1)
     seg3 = np.concatenate((seg1, seg2), axis=0)
-    # cv2.imshow('Segmentacao', seg3)
+    cv2.imshow('Segmentacao', seg3)
     return original
 
 
@@ -242,70 +220,70 @@ def find_hemorragia(imagens, diretorio, seg_min, seg_max, disk_size, sigma_val, 
             imagem, seg_max, diretorio, img_num)
         imagem = imagem * cc_mask
 
-        seg2 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
-            np.uint8), cv2.COLOR_GRAY2BGR)
-        os.makedirs(os.path.basename(diretorio), exist_ok=True)
-        cv2.imwrite("./" + os.path.basename(diretorio) +
-                    "/" + str(img_num) + "_SG2.png", seg2)
+        # seg2 = cv2.cvtColor(window_image(imagem, 60, 120).astype(
+        #     np.uint8), cv2.COLOR_GRAY2BGR)
+        # os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        # cv2.imwrite("./" + os.path.basename(diretorio) +
+        #             "/" + str(img_num) + "_SG2.png", seg2)
 
         imagem, gaussian_image = apply_gaussian_filter(
             seg_min, seg_max, sigma_val, imagem)
         # mostra_fg(i, cc_mask, gaussian_image)
 
-        fg = cv2.cvtColor(window_image(
-            gaussian_image, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-        os.makedirs(os.path.basename(diretorio), exist_ok=True)
-        cv2.imwrite("./" + os.path.basename(diretorio) +
-                    "/" + str(img_num) + "_FG.png", fg)
+        # fg = cv2.cvtColor(window_image(
+        #     gaussian_image, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        # os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        # cv2.imwrite("./" + os.path.basename(diretorio) +
+        #             "/" + str(img_num) + "_FG.png", fg)
 
-        seg3 = cv2.cvtColor(window_image(
-            imagem, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
-        os.makedirs(os.path.basename(diretorio), exist_ok=True)
-        cv2.imwrite("./" + os.path.basename(diretorio) +
-                    "/" + str(img_num) + "_SG3.png", seg3)
+        # seg3 = cv2.cvtColor(window_image(
+        #     imagem, 60, 120).astype(np.uint8), cv2.COLOR_GRAY2BGR)
+        # os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        # cv2.imwrite("./" + os.path.basename(diretorio) +
+        #             "/" + str(img_num) + "_SG3.png", seg3)
 
-        area = window_image(gaussian_image, 60, 120).astype(np.uint8)
-        antes = window_image(imagem, 60, 120).astype(np.uint8)
-        # imagem = morphology.binary_opening(
+        # area = window_image(gaussian_image, 60, 120).astype(np.uint8)
+        # antes = window_image(imagem, 60, 120).astype(np.uint8)
+        imagem = morphology.binary_opening(
+            imagem, morphology.disk(disk_size))
+
+        # imagem = morphology.binary_erosion(
         #     imagem, morphology.disk(disk_size))
+        # ero = cv2.cvtColor((window_image(
+        #     imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
+        # cv2.imwrite("./" + os.path.basename(diretorio) +
+        #             "/" + str(img_num) + "_ERO.png", ero)
 
-        imagem = morphology.binary_erosion(
-            imagem, morphology.disk(disk_size))
-        ero = cv2.cvtColor((window_image(
-            imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
-        cv2.imwrite("./" + os.path.basename(diretorio) +
-                    "/" + str(img_num) + "_ERO.png", ero)
-
-        imagem = morphology.binary_dilation(
-            imagem, morphology.disk(disk_size))
-        dil = cv2.cvtColor((window_image(
-            imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
-        cv2.imwrite("./" + os.path.basename(diretorio) +
-                    "/" + str(img_num) + "_DIL.png", dil)
+        # imagem = morphology.binary_dilation(
+        #     imagem, morphology.disk(disk_size))
+        # dil = cv2.cvtColor((window_image(
+        #     imagem, 60, 120).astype(np.uint8) * 255), cv2.COLOR_GRAY2BGR)
+        # cv2.imwrite("./" + os.path.basename(diretorio) +
+        #             "/" + str(img_num) + "_DIL.png", dil)
 
         if imagem.max() > 0:
             count += 1
-            seg = mostra_seg(img_num, total, i, imagem, area, antes)
-            os.makedirs(os.path.basename(diretorio), exist_ok=True)
-            cv2.imwrite("./" + os.path.basename(diretorio) +
-                        "/" + str(img_num) + "_SEG" + str(count) + ".png", seg)
-        else:
-            seg = mostra_seg(img_num, total, i, imagem, area, antes)
-            os.makedirs(os.path.basename(diretorio), exist_ok=True)
-            cv2.imwrite("./" + os.path.basename(diretorio) +
-                        "/" + str(img_num) + "_NOSEG.png", seg)
+            # seg = mostra_seg(img_num, total, i, imagem, area, antes)
+            # os.makedirs(os.path.basename(diretorio), exist_ok=True)
+            # cv2.imwrite("./" + os.path.basename(diretorio) +
+            #             "/" + str(img_num) + "_SEG" + str(count) + ".png", seg)
+        # else:
+            # seg = mostra_seg(img_num, total, i, imagem, area, antes)
+        #     os.makedirs(os.path.basename(diretorio), exist_ok=True)
+        #     cv2.imwrite("./" + os.path.basename(diretorio) +
+        #                 "/" + str(img_num) + "_NOSEG.png", seg)
         if (cv2.waitKey(1) & 0xFF) == ord('q'):
             cv2.destroyAllWindows()
             break
         slice_fim = datetime.now()
         slice_temp = slice_fim - slice_ini
-        # print(
-        #     f'Tempo Slice: {slice_temp.total_seconds()}')
+        print(
+            f'Tempo Slice: {slice_temp.total_seconds()}')
 
     exame_fim = datetime.now()
     exame_temp = exame_fim - exame_ini
-    # print(
-    #     f'Tempo Exame: {exame_temp.total_seconds()}')
+    print(
+        f'Tempo Exame: {exame_temp.total_seconds()}')
     if count >= 1:
         fw.write(os.path.basename(diretorio) + ";1;" + str(count) + "\n")
         fw.close()
@@ -339,7 +317,7 @@ def performance(bounds):
     seg_min, seg_max, disk_size, sigma_val = bounds
     print(bounds)
     fw = open("tcc_teste.csv", "w")
-    fw.write("PASTA;RES\n")
+    fw.write("REAL;PASTA;RES;QT_SLICES\n")
     fw.close()
     diretorios_teste = []
     validacao = []
@@ -359,16 +337,10 @@ def performance(bounds):
     f1txt = open("resultados.txt", "a")
     f1txt.write("%.20f, %.20f, %.20f, %.20f\n" %
                 (seg_min, seg_max, disk_size, sigma_val))
-    f1txt.write("F1-Score: %.20f\n" % (score))
+    f1txt.write("F1-Score: %.20f\n" % score)
     print("F1-Score:", score)
 
     matriz = confusion_matrix(validacao, res)
-    # cm_display = ConfusionMatrixDisplay(
-    #     confusion_matrix=matriz, display_labels=["Saudável", "Não Saudável"])
-    # cm_display.plot()
-    # cm_display.ax_.set(xlabel='Classificação Predita',
-    #                    ylabel='Classificação Real')
-
     sns.set_theme(font_scale=2, rc={'figure.figsize': (10, 8)})
     ax = sns.heatmap(matriz, annot=True, fmt='g',
                      cmap=sns.color_palette("flare", as_cmap=True))
@@ -391,17 +363,6 @@ def performance(bounds):
 def main():
     # bounds = [(50, 75), (75, 101), (2, 6), (0, 6)]
     # result = differential_evolution(performance, bounds)
-    # 50.08803987095695475773, 86.71610084319101474648, 4.84795220930039150176, 2.45324398424467071678 # usar esse
-    # 50.60006964356053771326, 86.56139984090714278864, 4.67032122564753926497, 2.23910991042969964582
-    # 50.31570196656763016563, 86.75417763293270922986, 4.72120205271766835153, 2.56849357717579485083
-    # 51.17108169100011849650, 86.59956876783407153653, 3.76213373312758125877, 6.87147069150776701463, 3.33002622294939554237 # original
-    # result = performance([51.17108169100011849650, 86.59956876783407153653,
-    #                       3.76213373312758125877, 3.33002622294939554237])
-    # result = performance([50.31570196656763016563, 86.75417763293270922986,
-    #                     4.72120205271766835153, 2.56849357717579485083])
-    # result = performance([50.60006964356053771326, 86.56139984090714278864,
-    #                      4.67032122564753926497, 2.23910991042969964582])
-
     result = performance([50.08803987095695475773, 86.71610084319101474648,
                          4.84795220930039150176, 2.45324398424467071678])
     # result = performance([60, 90, 3, 1])

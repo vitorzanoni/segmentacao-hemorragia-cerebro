@@ -131,3 +131,5 @@ dmypy.json
 artigos/*
 CQ*/
 DE/
+ignore/*
+.idea
